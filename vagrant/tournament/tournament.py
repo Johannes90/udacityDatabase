@@ -1,84 +1,83 @@
 #!/usr/bin/env python
 # 
 # tournament.py -- implementation of a Swiss-system tournament
-#
+# This document contains functions as the basis for a swiss tournament system. The user needs to innitialize the database
+# first as described in the Readme.md in this repository.
 
 import psycopg2
 
 
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
+    try:
+        db = psycopg2.connect("dbname=tournament")
+        cursor = db.cursor()
+        return db, cursor
+    except:
+        print("Could not connect to the database")
 
 
 def deleteMatches():
     """Remove all the match records from the database."""
-    DB = psycopg2.connect("dbname=tournament")
-    c = DB.cursor()
-    c.execute("DELETE FROM matches")
-    DB.commit()
-    DB.close()
+    db, cursor = connect()
+    query = "DELETE FROM matches"
+    cursor.execute(query)
+    db.commit()
+    db.close()
 
     return "Matches deleted"
 
 
 def deletePlayers():
     """Remove all the player records from the database."""
-    DB = psycopg2.connect("dbname=tournament")
-    c = DB.cursor()
+    db, cursor = connect()
     try:
-        c.execute("DELETE FROM players")
+        cursor.execute("TRUNCATE TABLE players CASCADE")
         print("deleted all players")
     except:
         print("could not delete")
 
-    DB.commit()
-    DB.close()
+    db.commit()
+    db.close()
 
 
 def countPlayers():
     """Returns the number of players currently registered."""
-    DB = psycopg2.connect("dbname=tournament")
-    c = DB.cursor()
-    c.execute("SELECT COUNT(*) FROM players")
-    count = c.fetchone()
-    DB.close()
+    db, cursor = connect()
+    query = "SELECT COUNT(*) FROM players"
+    cursor.execute(query)
+    count = cursor.fetchone()
+    db.close()
 
     return count[0]
 
 
-
 def registerPlayer(name):
     """Adds a player to the tournament database.
-    
+
     The database assigns a unique serial id number for the player.  (This
     should be handled by your SQL database schema, not in your Python code.)
-  
+
     Args:
       name: the player's full name (need not be unique).
     """
 
-    DB = psycopg2.connect("dbname=tournament")
-    c = DB.cursor()
-    # try: 
-    query = "INSERT INTO players(name) VALUES (%s)"
-    data = (name, )
-    c.execute(query, data)
-
-
-    # except:
-    #     print("Could not insert player")
-
-    DB.commit()
-    DB.close()
-
+    db, cursor = connect()
+    try:
+        query = "INSERT INTO players(name) VALUES (%s)"
+        data = (name, )
+        cursor.execute(query, data)
+    except:
+        print("Could not insert player")
+    db.commit()
+    db.close()
 
 
 def playerStandings():
     """Returns a list of the players and their win records, sorted by wins.
 
-    The first entry in the list should be the player in first place, or a player
-    tied for first place if there is currently a tie.
+    The first entry in the list should be the player in first place,
+    or a player tied for first place if there is currently a tie.
 
     Returns:
       A list of tuples, each of which contains (id, name, wins, matches):
@@ -88,14 +87,15 @@ def playerStandings():
         matches: the number of matches the player has played
     """
 
-    DB = psycopg2.connect("dbname=tournament")
-    c = DB.cursor()
-    c.execute("SELECT * FROM playerStandings")
-    standings = c.fetchall()
-    DB.close()
-
-    return standings
-
+    db, cursor = connect()
+    try:
+        query = "SELECT * FROM playerStandings"
+        cursor.execute(query)
+        standings = cursor.fetchall()
+        db.close()
+        return standings
+    except:
+        print("Could not retrieve player standings")
 
 
 def reportMatch(winner, loser):
@@ -105,26 +105,26 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
-
-    DB = psycopg2.connect("dbname=tournament")
-    c = DB.cursor()
+    db, cursor = connect()
     try:
-        c.execute("INSERT INTO matches(winner,loser) VALUES (%s, %s)", (winner,loser))
+        query = "INSERT INTO matches(winner,loser) VALUES (%s, %s)"
+        data = (winner, loser)
+        cursor.execute(query, data)
     except:
         print("Could not insert match")
 
-    DB.commit()
-    DB.close()
+    db.commit()
+    db.close()
 
- 
+
 def swissPairings():
     """Returns a list of pairs of players for the next round of a match.
-  
+
     Assuming that there are an even number of players registered, each player
     appears exactly once in the pairings.  Each player is paired with another
     player with an equal or nearly-equal win record, that is, a player adjacent
     to him or her in the standings.
-  
+
     Returns:
       A list of tuples, each of which contains (id1, name1, id2, name2)
         id1: the first player's unique id
@@ -132,20 +132,14 @@ def swissPairings():
         id2: the second player's unique id
         name2: the second player's name
     """
-    DB = psycopg2.connect("dbname=tournament")
-    c = DB.cursor()
-
-    c.execute("SELECT * FROM playerStandings")
-    standings = c.fetchall()
+    db, cursor = connect()
+    query = "SELECT * FROM playerStandings"
+    cursor.execute(query)
+    standings = cursor.fetchall()
     pairingNum = len(standings)
     pairings = []
 
-    for player in range(0,pairingNum,2):
-        match = (standings[player][0], standings[player][1], standings[player+1][0], standings[player+1][1])
+    for player in range(0, pairingNum, 2):
+        match = (standings[player][0], standings[player][1], standings[player + 1][0], standings[player + 1][1])
         pairings.append(match)
     return pairings
-
-print(swissPairings())
-
-
-
